@@ -11,10 +11,19 @@ namespace humhub\modules\cleanTheme;
 use humhub\libs\DynamicConfig;
 use humhub\modules\ui\view\helpers\ThemeHelper;
 use Yii;
+use yii\base\Exception;
 use yii\helpers\Url;
 
+/**
+ * Module class for Clean Theme module.
+ *
+ * This module provides a clean theme for HumHub based on the Community theme.
+ */
 class Module extends \humhub\components\Module
 {
+    /**
+     * @var array The name of the clean themes.
+     */
     public const THEME_NAMES = [
         'clean-base',
         'clean-bordered',
@@ -22,33 +31,59 @@ class Module extends \humhub\components\Module
     ];
 
     /**
-     * @inheridoc
+     * @var string The icon for the module.
      */
     public string $icon = 'circle-o-notch';
 
     /**
-     * @inheridoc
+     * @var string The path to the module's resources.
      */
     public $resourcesPath = 'resources';
 
-    public bool $hideTopMenuOnScrollDown = true; // On small screens only
-    public bool $hideBottomMenuOnScrollDown = true; // On small screens only
-    public bool $hideTextInBottomMenuItems = true; // On small screens only
+    /**
+     * @var bool Whether to hide the top menu on scroll down (on small screens only).
+     */
+    public bool $hideTopMenuOnScrollDown = true;
+
+    /**
+     * @var bool Whether to hide the bottom menu on scroll down (on small screens only).
+     */
+    public bool $hideBottomMenuOnScrollDown = true;
+
+    /**
+     * @var bool Whether to hide text in bottom menu items (on small screens only).
+     */
+    public bool $hideTextInBottomMenuItems = true;
+
+    /**
+     * @var bool Whether to make the left navigation collapsible.
+     */
     public bool $collapsibleLeftNavigation = false;
 
-
+    /**
+     * Returns the name of the module.
+     *
+     * @return string The module name.
+     */
     public function getName()
     {
         return Yii::t('CleanThemeModule.config', 'Clean theme');
     }
 
+    /**
+     * Returns the description of the module.
+     *
+     * @return string The module description.
+     */
     public function getDescription()
     {
         return Yii::t('CleanThemeModule.config', 'Clean theme for Humhub based on the Community theme');
     }
 
     /**
-     * @inheritdoc
+     * Returns the URL for configuring the module.
+     *
+     * @return string The configuration URL.
      */
     public function getConfigUrl()
     {
@@ -56,7 +91,7 @@ class Module extends \humhub\components\Module
     }
 
     /**
-     * @inheritdoc
+     * Disables the module.
      */
     public function disable()
     {
@@ -65,21 +100,9 @@ class Module extends \humhub\components\Module
     }
 
     /**
-     * @return void
-     */
-    private function disableTheme()
-    {
-        foreach (ThemeHelper::getThemeTree(Yii::$app->view->theme) as $theme) {
-            if (in_array($theme->name, self::THEME_NAMES, true)) {
-                $ceTheme = ThemeHelper::getThemeByName('HumHub');
-                $ceTheme->activate();
-                break;
-            }
-        }
-    }
-
-    /**
-     * @inheritdoc
+     * Enables the module.
+     *
+     * @return bool Whether the module was successfully enabled.
      */
     public function enable()
     {
@@ -91,21 +114,56 @@ class Module extends \humhub\components\Module
     }
 
     /**
-     * @return void
+     * Enables the clean theme.
+     *
+     * @throws Exception if an error occurs while enabling the theme.
      */
     private function enableTheme()
     {
-        // Check if already active
+        try {
+            foreach (ThemeHelper::getThemeTree(Yii::$app->view->theme) as $theme) {
+                if ($theme->name === self::THEME_NAMES) return;
+            }
+
+            $theme = ThemeHelper::getThemeByName(self::THEME_NAMES);
+            if ($theme !== null) {
+                $theme->activate();
+                $this->updateDynamicConfig();
+            }
+        } catch (Exception $e) {
+            Yii::error('Error enabling theme: ' . $e->getMessage(), 'clean-theme');
+            throw $e;
+        }
+    }
+
+    /**
+     * Disables the clean theme.
+     */
+    private function disableTheme()
+    {
         foreach (ThemeHelper::getThemeTree(Yii::$app->view->theme) as $theme) {
-            if (in_array($theme->name, self::THEME_NAMES, true)) {
-                return;
+            if ($theme->name === self::THEME_NAMES) {
+                $ceTheme = ThemeHelper::getThemeByName('HumHub');
+                $ceTheme->activate();
+                break;
             }
         }
+    }
 
-        $theme = ThemeHelper::getThemeByName($this->getBaseThemeName());
-        if ($theme !== null) {
-            $theme->activate();
-            DynamicConfig::rewrite();
+    /**
+     * Updates the dynamic configuration after enabling the theme.
+     *
+     * @throws Exception if an error occurs while updating the dynamic configuration.
+     */
+    private function updateDynamicConfig()
+    {
+        try {
+            $config = DynamicConfig::load();
+            $config['theme'] = self::THEME_NAMES;
+            DynamicConfig::save($config);
+        } catch (Exception $e) {
+            Yii::error('Error updating dynamic config: ' . $e->getMessage(), 'clean-theme');
+            throw $e;
         }
     }
 
